@@ -1,0 +1,87 @@
+@page "/fetchproducts"
+@using ClientApp.Models
+@using ClientApp.Services
+@inject ProductService ProductService
+
+<h3>Product List</h3>
+
+<button class="btn btn-sm btn-secondary mb-3" @onclick="RefreshProducts">
+    🔄 Refresh (Cache: 5 min)
+</button>
+
+<ul>
+    @if (isLoading)
+    {
+        <li>Loading...</li>
+    }
+    else if (!string.IsNullOrEmpty(errorMessage))
+    {
+        <li class="text-danger">@errorMessage</li>
+    }
+    else if (products is { Length: > 0 })
+    {
+        @foreach (var product in products)
+        {
+            <li>
+                <strong>@product.Name</strong> - $@product.Price
+                <div class="small text-secondary">Stock: @product.Stock | Category: @product.Category.Name</div>
+            </li>
+        }
+    }
+    else
+    {
+        <li>No products available.</li>
+    }
+</ul>
+
+@code {
+    private Product[]? products;
+    private string? errorMessage;
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProducts();
+    }
+
+    private async Task LoadProducts()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            products = await ProductService.GetProductsAsync();
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMessage = "Network error: " + ex.Message;
+            products = Array.Empty<Product>();
+        }
+        catch (InvalidOperationException ex)
+        {
+            errorMessage = ex.Message;
+            products = Array.Empty<Product>();
+        }
+        catch (System.Text.Json.JsonException ex)
+        {
+            errorMessage = "Invalid JSON response: " + ex.Message;
+            products = Array.Empty<Product>();
+        }
+        catch (Exception ex)
+        {
+            errorMessage = "Unexpected error: " + ex.Message;
+            products = Array.Empty<Product>();
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task RefreshProducts()
+    {
+        ProductService.ClearCache();
+        await LoadProducts();
+    }
+}
